@@ -41,13 +41,16 @@ def main(args):
 <html>
 <head>
   <meta charset="utf8">
-  <meta name="viewport" content="width:device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ukrainian toponyms</title>
 <style>
-:root {{ color-scheme: light dark; }}
+:root {{ color-scheme: light dark; --hi: #eef; }}
+@media (prefers-color-scheme: dark) {{
+:root {{ --hi: #433; }}
+}}
 .table {{
   display: grid;
-  gap: 0.1rem 1rem;
+  gap: 0;
   white-space: nowrap;
 }}
 .grid4 {{
@@ -61,8 +64,14 @@ def main(args):
   text-align: center;
 }}
 .table > div {{
+  display: contents;
+}}
+.table > div > div {{
   border-right: 1px solid #ccc;
-  padding-right: 0.5rem;
+  padding: 0.1rem 0 0.1rem 1rem;
+}}
+.table > div:hover > div {{
+    background-color: var(--hi);
 }}
 </style>
 </head>
@@ -84,9 +93,9 @@ Contents
 <div>
 Transliteration
 <ul>
-<li><code>Lat-A</code>: <a href="https://uk.wikipedia.org/wiki/%D0%94%D0%A1%D0%A2%D0%A3_9112:2021">DSTU 9112:2021, System A</a></li>
-<li><code>Lat-B</code>: <a href="https://uk.wikipedia.org/wiki/%D0%94%D0%A1%D0%A2%D0%A3_9112:2021">DSTU 9112:2021, System B</a></li>
-<li><code>Lat-KMU</code>: <a href="https://zakon.rada.gov.ua/laws/show/55-2010-%D0%BF">KMU 55:2010</a></li>
+<li><code>uk-Latn-A</code>: <a href="https://uk.wikipedia.org/wiki/%D0%94%D0%A1%D0%A2%D0%A3_9112:2021">DSTU 9112:2021, System A</a></li>
+<li><code>uk-Latn-B</code>: <a href="https://uk.wikipedia.org/wiki/%D0%94%D0%A1%D0%A2%D0%A3_9112:2021">DSTU 9112:2021, System B</a></li>
+<li><code>uk-Latn-K</code>: <a href="https://zakon.rada.gov.ua/laws/show/55-2010-%D0%BF">KMU 55:2010</a></li>
 </ul>
 </div>
 ''', file=fout)
@@ -96,14 +105,18 @@ Transliteration
     resolver = dict(level1=oblasts, level2=raions)
 
     fieldnames = 'name level1 level2 name-dstua name-dstub name-kmu'.split()
-    alias = dict(zip(fieldnames, ('Name', 'Oblast', 'Raion', 'Lat-A', 'Lat-B', 'Lat-KMU')))
+    alias = dict(zip(fieldnames, ('Name', 'Oblast', 'Raion', 'uk-Latn-A', 'uk-Latn-B', 'uk-Latn-K')))
 
     def gen_table(title, fieldnames, /, category=None, resolver=None, unique=False):
         fn = len(fieldnames)
         print(f'''<h2 id="table{category}">{title}</h2>
 <div class="table grid{fn}">''', file=fout)
+
+        print('<div>', file=fout)
         for k in fieldnames:
             print(f'<div class="th">{alias[k]}</div>', file=fout)
+        print('</div>', file=fout)
+
         colt = icu.Collator.create_instance(icu.Locale('uk_UA.UTF-8'))
         rows = sorted(dbquery(category), key=lambda p: colt.get_sort_key(p['name']))
         seen = set()
@@ -113,6 +126,7 @@ Transliteration
                     continue
                 else:
                     seen.add(row['name'])
+            print('<div>', file=fout)
             for k in fieldnames:
                 gen = gens.get(k, gen_)
                 if resolver and (res := resolver.get(k)) is not None:
@@ -120,6 +134,7 @@ Transliteration
                     k = res.get(q) or resolver['level1'].get(q)
                 val = gen(row, k)
                 print(val, file=fout)
+            print('</div>', file=fout)
         print('</div>\n', file=fout)
 
     fieldnames = 'name name-dstua name-dstub name-kmu'.split()
