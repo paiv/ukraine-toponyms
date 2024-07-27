@@ -93,8 +93,8 @@ Contents
 <div>
 Transliteration
 <ul>
-<li><code>uk-Latn-A</code>: <a href="https://uk.wikipedia.org/wiki/%D0%94%D0%A1%D0%A2%D0%A3_9112:2021">DSTU 9112:2021, System A</a></li>
-<li><code>uk-Latn-B</code>: <a href="https://uk.wikipedia.org/wiki/%D0%94%D0%A1%D0%A2%D0%A3_9112:2021">DSTU 9112:2021, System B</a></li>
+<li><code>uk-Latn-A</code>: <a href="https://uk.wikipedia.org/wiki/%D0%94%D0%A1%D0%A2%D0%A3_9112:2021">DSTU 9112:2021 System A</a></li>
+<li><code>uk-Latn-B</code>: <a href="https://uk.wikipedia.org/wiki/%D0%94%D0%A1%D0%A2%D0%A3_9112:2021">DSTU 9112:2021 System B</a></li>
 <li><code>uk-Latn-K</code>: <a href="https://zakon.rada.gov.ua/laws/show/55-2010-%D0%BF">KMU 55:2010</a></li>
 </ul>
 </div>
