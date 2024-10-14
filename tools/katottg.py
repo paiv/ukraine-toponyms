@@ -3,14 +3,16 @@ import csv
 import html.parser
 import os
 import re
+import shutil
+import ssl
 import sys
 import time
+import urllib.error
 import urllib.request
 from email.utils import parsedate_to_datetime as parse_date
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit, urlunsplit
 from urllib.request import pathname2url
-
 
 _DefaultFetchUrl = 'https://mtu.gov.ua/content/kodifikator-administrativnoteritorialnih-odinic-ta-teritoriy-teritorialnih-gromad.html'
 
@@ -76,25 +78,36 @@ def wget(url, headers=None, timeout=30, filename=None):
     opener = urllib.request.build_opener()
     opener.addheaders = list(headers.items())
     urllib.request.install_opener(opener)
+    sslc = ssl.create_default_context()
 
     delay = 1
     while True:
         try:
             if filename:
-                _, headers = urllib.request.urlretrieve(url, filename=filename)
-                if (ts := headers.get('Last-Modified')) is not None:
+                # _, rheaders = urllib.request.urlretrieve(url, filename=filename, context=sslc)
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=timeout, context=sslc) as r:
+                    with open(filename, 'wb') as fp:
+                        shutil.copyfileobj(r, fp)
+                if (ts := r.headers.get('Last-Modified')) is not None:
                     ts = parse_date(ts).timestamp()
                     os.utime(filename, (ts, ts))
                 return filename
             else:
                 req = urllib.request.Request(url, headers=headers)
-                with urllib.request.urlopen(req, timeout=timeout) as r:
+                with urllib.request.urlopen(req, timeout=timeout, context=sslc) as r:
                     trace(r.url, r.status, r.reason)
                     return r.read()
+        except urllib.error.URLError as e:
+            trace(repr(e))
+            if isinstance(e.reason, ssl.SSLCertVerificationError):
+                trace('disable host verification')
+                sslc.check_hostname = False
+                sslc.verify_mode = ssl.CERT_NONE
         except Exception as e:
             trace(repr(e))
-            time.sleep(delay)
-            delay *= 1.44
+        time.sleep(delay)
+        delay *= 1.44
 
 
 def parse_pdf(filename):
