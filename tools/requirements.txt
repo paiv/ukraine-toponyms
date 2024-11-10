@@ -1,3 +1,4 @@
 icupy
 pypdf
 openpyxl
+git+https://github.com/paiv/uklatn.git

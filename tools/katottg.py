@@ -7,6 +7,7 @@ import shutil
 import ssl
 import sys
 import time
+import uklatn
 import urllib.error
 import urllib.request
 from email.utils import parsedate_to_datetime as parse_date
@@ -147,159 +148,6 @@ def parse_xlsx(filename):
             yield (ks, c, s)
 
 
-def _make_trs():
-    def _transliterator(rx, sb, text):
-        return rx.sub(sb, text)
-
-    def silly(s): return s.lower()[:-1] + s.lower()[-1].upper()
-
-    def _compile(rules):
-        loabc = 'абвгґдеєжзиіїйклмнопрстуфхцчшщьюя'
-        hiabc = loabc.upper()
-        consonants = 'бвгґджзйклмнпрстфхцчшщ'
-        vowels = 'аеєиіїоуюя'
-        apos = "'\u2019\u02BC"
-        default_rules = dict()
-        word_start_rules = dict()
-        after_cons_rules = dict()
-
-        for key, rule in rules.items():
-            lokey = key.lower()
-            hikey = lokey.upper()
-            if rule is None:
-                rule = ''
-            if isinstance(rule, dict):
-                if (value := rule.get('start')) is not None:
-                    word_start_rules[lokey] = value
-                    word_start_rules[hikey] = value.title()
-                    if len(key) > 1:
-                        word_start_rules[key.title()] = value.title()
-                        word_start_rules[silly(key)] = silly(value)
-                if (value := rule.get('cons')) is not None:
-                    after_cons_rules[lokey] = value
-                    after_cons_rules[hikey] = value.title()
-                value = rule.get('other', '')
-                default_rules[lokey] = value
-                default_rules[hikey] = value.title()
-                if len(key) > 1:
-                    default_rules[key.title()] = value.title()
-                    default_rules[silly(key)] = silly(value)
-            else:
-                if "'" in key:
-                    for c in apos:
-                        newkey = key.replace("'", c)
-                        default_rules[newkey] = rule
-                else:
-                    default_rules[lokey] = rule
-                    default_rules[hikey] = rule.title()
-                    if len(key) > 1:
-                        default_rules[key.title()] = rule.title()
-                        default_rules[silly(key)] = silly(rule)
-
-        default_keyset1 = [k for k in default_rules if len(k) == 1]
-        default_keyset2 = sorted([k for k in default_rules if len(k) > 1], key=len, reverse=True)
-        word_start_keyset = list(word_start_rules)
-        assert all(len(k) == 1 for k in word_start_keyset)
-        consonants_keyset = consonants + consonants.upper()
-        after_cons_keyset = list(after_cons_rules)
-        assert all(len(k) == 1 for k in after_cons_keyset)
-        inner1 = f'[^{loabc}{hiabc}{apos}]'
-        inner2 = f'[{"".join(word_start_keyset)}]' if word_start_keyset else '\uFFFC\uFFFC'
-        inner3 = f'{"|".join(default_keyset2)}' if default_keyset2 else '\uFFFC\uFFFC'
-        inner4 = f'[{"".join(consonants_keyset)}]' + (f'[{"".join(after_cons_keyset)}]' if after_cons_keyset else '\uFFFC\uFFFC')
-        inner5 = f'[{"".join(default_keyset1)}]'
-        rx = re.compile(f'(?:(?:(?P<g1>^|{inner1})(?P<g2>{inner2}))|(?:(?P<g3>{inner3})|(?P<g4>{inner4})|(?P<g5>{inner5})))')
-        # trace(repr(rx.pattern))
-
-        def sb(m):
-            gs = m.groupdict()
-            if (k := gs.get('g5')):
-                return default_rules[k]
-            if (k := gs.get('g3')):
-                return default_rules[k]
-            if (k := gs.get('g4')):
-                x = default_rules[k[0]]
-                v = after_cons_rules[k[1]]
-                return x + v
-            if (k := gs.get('g2')):
-                x = gs['g1']
-                v = word_start_rules[k]
-                return x + v
-
-        def worker(text):
-            return _transliterator(rx, sb, text)
-        return worker
-
-    base = dict(zip("'абвгґдеєжзиіїйклмнопрстуфхцчшщьюя", "'abvggdeezzyiijklmnoprstufxccssjua"))
-
-    dstua = dict(base)
-    dstua['г'] = 'ğ'
-    dstua['є'] = 'je'
-    dstua['ж'] = 'ž'
-    dstua['ї'] = 'ï'
-    dstua['й'] = dict(cons="'j", other='j')
-    dstua['йа'] = "j'a"
-    dstua['йе'] = "j'e"
-    dstua['йу'] = "j'u"
-    dstua['ч'] = 'č'
-    dstua['ш'] = 'š'
-    dstua['щ'] = 'ŝ'
-    dstua['ь'] = dict(cons='j', other='ĵ')
-    dstua['ьа'] = "j'a"
-    dstua['ье'] = "j'e"
-    dstua['ьу'] = "j'u"
-    dstua['ю'] = 'ju'
-    dstua['я'] = 'ja'
-    dstua = _compile(dstua)
-
-    dstub = dict(base)
-    dstub['г'] = 'gh'
-    dstub['є'] = 'je'
-    dstub['ж'] = 'zh'
-    dstub['ї'] = 'ji'
-    dstub['й'] = dict(cons="'j", other='j')
-    dstub['йа'] = "j'a"
-    dstub['йе'] = "j'e"
-    dstub['йі'] = "j'i"
-    dstub['йу'] = "j'u"
-    dstub['х'] = 'kh'
-    dstub['ч'] = 'ch'
-    dstub['ш'] = 'sh'
-    dstub['шч'] = "sh'ch"
-    dstub['щ'] = 'shch'
-    dstub['ь'] = dict(cons='j', other='hj')
-    dstub['ьа'] = "j'a"
-    dstub['ье'] = "j'e"
-    dstub['ьі'] = "j'i"
-    dstub['ьу'] = "j'u"
-    dstub['ю'] = 'ju'
-    dstub['я'] = 'ja'
-    dstub = _compile(dstub)
-
-    kmu = dict(base)
-    kmu["'"] = ''
-    kmu['г'] = 'h'
-    kmu['є'] = dict(start='ye', other='ie')
-    kmu['ж'] = 'zh'
-    kmu['зг'] = 'zgh'
-    kmu['ї'] = dict(start='yi', other='i')
-    kmu['й'] = dict(start='y', other='i')
-    kmu['х'] = 'kh'
-    kmu['ц'] = 'ts'
-    kmu['ч'] = 'ch'
-    kmu['ш'] = 'sh'
-    kmu['щ'] = 'shch'
-    kmu['ь'] = ''
-    kmu['ю'] = dict(start='yu', other='iu')
-    kmu['я'] = dict(start='ya', other='ia')
-    kmu = _compile(kmu)
-
-    return (dstua, dstub, kmu)
-
-
-uk_lat_dstua, uk_lat_dstub, uk_lat_kmu = _make_trs()
-
-
 def main(args):
     caches = resolve_cachedir(args.cache)
     if args.fetch_latest:
@@ -335,9 +183,9 @@ def main(args):
         obj = dict(category=c, name=s)
         for i,k in enumerate(ks, 1):
             obj[f'level{i}'] = k
-        obj['name-dstua'] = uk_lat_dstua(s)
-        obj['name-dstub'] = uk_lat_dstub(s)
-        obj['name-kmu'] = uk_lat_kmu(s)
+        obj['name-dstua'] = uklatn.encode(s, uklatn.DSTU_9112_A)
+        obj['name-dstub'] = uklatn.encode(s, uklatn.DSTU_9112_B)
+        obj['name-kmu'] = uklatn.encode(s, uklatn.KMU_55)
         writer.writerow(obj)
 
 
