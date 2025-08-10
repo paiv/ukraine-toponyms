@@ -33,7 +33,7 @@ def main(args):
         fout = Path(fileto).open('w')
 
     ts = datetime.now(UTC)
-    timestamp = ts.isoformat()
+    timestamp = ts.date().isoformat()
 
     gens = dict()
     
@@ -87,8 +87,8 @@ Contents
 <li><a href="#tableKM">Cities</a></li>
 </ul>
 </div>
-<p>Data compiled from <a href="https://mtu.gov.ua/">https://mtu.gov.ua/</a>.</p>
-<p>Generated at {timestamp}</p>
+<p>Data compiled from <a href="https://mindev.gov.ua/">https://mindev.gov.ua/</a>.</p>
+<p>Generated on {timestamp}</p>
 </div>
 <div>
 Transliteration

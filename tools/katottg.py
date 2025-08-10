@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import urljoin, urlsplit, urlunsplit
 from urllib.request import pathname2url
 
-_DefaultFetchUrl = 'https://mtu.gov.ua/content/kodifikator-administrativnoteritorialnih-odinic-ta-teritoriy-teritorialnih-gromad.html'
+_DefaultFetchUrl = 'https://mindev.gov.ua/diialnist/rozvytok-mistsevoho-samovriaduvannia/kodyfikator-administratyvno-terytorialnykh-odynyts-ta-terytorii-terytorialnykh-hromad'
 
 _logger = logging.getLogger(Path(__file__).name)
 
@@ -61,19 +61,22 @@ def fetch_latest(caches):
             fn = Path(url)
             name = fn.name
             ext = fn.suffix
-            if re.match(r'^[Кк]одиф', name):
+            if re.match(r'[Кк]одиф|kodif', name, flags=re.I):
                 ps = list(urlsplit(url))
                 ps[2] = pathname2url(urlsplit(url).path)
                 url = urlunsplit(ps)
                 cfn = caches / ('katottg' + ext)
                 wget(url, filename=cfn)
                 return cfn
+    else:
+        _logger.error('file link not found')
+        exit(1)
 
 
 def wget(url, headers=None, timeout=30, filename=None):
     _logger.debug('GET %s', url)
  
-    default_headers = {'User-Agent': 'Mozilla/1.0'}
+    default_headers = {'User-Agent': 'Mozilla/5.0'}
     headers = default_headers | (headers or dict())
     opener = urllib.request.build_opener()
     opener.addheaders = list(headers.items())
