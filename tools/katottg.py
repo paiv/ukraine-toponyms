@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import csv
 import html.parser
+import logging
 import os
 import re
 import shutil
@@ -17,9 +18,7 @@ from urllib.request import pathname2url
 
 _DefaultFetchUrl = 'https://mtu.gov.ua/content/kodifikator-administrativnoteritorialnih-odinic-ta-teritoriy-teritorialnih-gromad.html'
 
-
-def trace(*args, **kwargs):
-    print(*args, file=sys.stderr, flush=True, **kwargs)
+_logger = logging.getLogger(Path(__file__).name)
 
 
 def resolve_cachedir(caches=None):
@@ -72,7 +71,7 @@ def fetch_latest(caches):
 
 
 def wget(url, headers=None, timeout=30, filename=None):
-    trace('get', url)
+    _logger.debug('GET %s', url)
  
     default_headers = {'User-Agent': 'Mozilla/1.0'}
     headers = default_headers | (headers or dict())
@@ -97,22 +96,22 @@ def wget(url, headers=None, timeout=30, filename=None):
             else:
                 req = urllib.request.Request(url, headers=headers)
                 with urllib.request.urlopen(req, timeout=timeout, context=sslc) as r:
-                    trace(r.url, r.status, r.reason)
+                    _logger.debug('%s %d %s', r.url, r.status, r.reason)
                     return r.read()
         except urllib.error.URLError as e:
-            trace(repr(e))
+            _logger.warning(e)
             if isinstance(e.reason, ssl.SSLCertVerificationError):
-                trace('disable host verification')
+                _logger.warning('disable host verification')
                 sslc.check_hostname = False
                 sslc.verify_mode = ssl.CERT_NONE
         except Exception as e:
-            trace(repr(e))
+            _logger.warning(e)
         time.sleep(delay)
         delay *= 1.44
 
 
 def parse_pdf(filename):
-    trace('reading', str(filename))
+    _logger.debug('reading %s', str(filename))
     from pypdf import PdfReader
     reader = PdfReader(filename)
     rx = re.compile(r'^\s*((?:UA\d{17}\s+)+)(\S)\s+(.+)\s*$')
@@ -125,13 +124,13 @@ def parse_pdf(filename):
                 ks = ks.split()
                 s = ' '.join(s.split())
                 if c == 'С':
-                    trace('fix cyr С:', ks[-1], repr(c), repr(s))
+                    _logger.warning('fix cyr С: %s %s %s', ks[-1], repr(c), repr(s))
                     c = 'C'
                 yield (ks, c, s)
 
 
 def parse_xlsx(filename):
-    trace('reading', str(filename))
+    _logger.debug('reading %s', str(filename))
     import openpyxl
     book = openpyxl.load_workbook(filename)
     sheet = book.active
@@ -143,7 +142,7 @@ def parse_xlsx(filename):
             ks = list(filter(None, ks))
             s = ' '.join(s.split())
             if c == 'С':
-                trace('fix cyr С:', ks[-1], repr(c), repr(s))
+                _logger.warning('fix cyr С: %s %s %s', ks[-1], repr(c), repr(s))
                 c = 'C'
             yield (ks, c, s)
 
@@ -166,7 +165,7 @@ def main(args):
         
     codes = list(rows)
 
-    trace('sorting...')
+    _logger.debug('sorting...')
     codes = sorted(codes)
 
     if (args.output is None) or (args.output == '-'):
@@ -174,7 +173,7 @@ def main(args):
     else:
         fp = Path(args.output).open('w', newline='')
 
-    trace('writing', fp.name)
+    _logger.debug('writing %s', fp.name)
 
     fields = 'level1 level2 level3 level4 level5 category name name-dstua name-dstub name-kmu'.split()
     writer = csv.DictWriter(fp, fieldnames=fields)
@@ -196,7 +195,11 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output', help='output CSV filename')
     parser.add_argument('-c', '--cache', help='cache directory')
     parser.add_argument('-f', '--fetch-latest', action='store_true', help='download latest Kodyfikator file')
+    parser.add_argument('-v', '--verbose', action='store_true', help='verbose output')
     args = parser.parse_args()
+
+    level = logging.DEBUG if args.verbose else logging.WARN
+    logging.basicConfig(level=level)
 
     if not args.fetch_latest and not args.file:
         caches = resolve_cachedir(args.cache)
